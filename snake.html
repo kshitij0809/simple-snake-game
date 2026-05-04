@@ -184,12 +184,27 @@ function main() {
  * Resets and inits game objects
  */
 function init() {
+	// Determine if this is a restart (score > 0 or frames > 0) or first start
+	var startType = (typeof frames !== "undefined" && frames > 0) ? "restart" : "initial";
+
 	score = 0;
 	grid.init(EMPTY, COLS, ROWS);
 	var sp = {x:Math.floor(COLS/2), y:ROWS-1};
 	snake.init(UP, sp.x, sp.y);
 	grid.set(SNAKE, sp.x, sp.y);
 	setFood();
+
+	// Track game start event
+	if (typeof pendo !== "undefined" && pendo.track) {
+		pendo.track("game_started", {
+			start_type: startType,
+			grid_width: COLS,
+			grid_height: ROWS,
+			snake_start_x: sp.x,
+			snake_start_y: sp.y,
+			snake_start_direction: "UP"
+		});
+	}
 }
 /**
  * The game loop function, used for game updates and rendering
@@ -246,6 +261,27 @@ function update() {
 			0 > ny || ny > grid.height-1 ||
 			grid.get(nx, ny) === SNAKE
 		) {
+			// Determine collision type
+			var collisionType;
+			if (0 > nx || nx > grid.width-1 || 0 > ny || ny > grid.height-1) {
+				collisionType = "wall";
+			} else {
+				collisionType = "self";
+			}
+
+			// Track game over event
+			if (typeof pendo !== "undefined" && pendo.track) {
+				pendo.track("game_over", {
+					final_score: score,
+					collision_type: collisionType,
+					collision_x: nx,
+					collision_y: ny,
+					snake_length: snake._queue.length,
+					snake_direction: ["LEFT","UP","RIGHT","DOWN"][snake.direction],
+					frames_survived: frames
+				});
+			}
+
 			return init();
 		}
 		// check wheter the new position are on the fruit item
@@ -253,6 +289,17 @@ function update() {
 			// increment the score and sets a new fruit position
 			score++;
 			setFood();
+
+			// Track fruit eaten event
+			if (typeof pendo !== "undefined" && pendo.track) {
+				pendo.track("fruit_eaten", {
+					new_score: score,
+					fruit_x: nx,
+					fruit_y: ny,
+					snake_length: snake._queue.length + 1,
+					frames_elapsed: frames
+				});
+			}
 		} else {
 			// take out the first item from the snake queue i.e
 			// the tail and remove id from grid
